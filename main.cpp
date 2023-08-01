@@ -3,6 +3,7 @@
 #include <math.h>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 double sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
@@ -176,16 +177,28 @@ void updateWeights(double learningRate) {
     }
 }
 
-
 void train(const std::vector<std::vector<double>>& inputs, const std::vector<std::vector<double>>& targets, int iterations, double learningRate) {
     for (int i = 0; i < iterations; i++) {
+        double totalError = 0.0;
         for (int j = 0; j < inputs.size(); j++) {
             feedForward(inputs[j]);
             backPropagate(targets[j]);
             updateWeights(learningRate);
+            totalError += calculateError(targets[j]);
         }
+        std::cout << "Iteration: " << i + 1 << " / " << iterations << ", Error: " << totalError / inputs.size() << std::endl;
     }
-  }
+}
+
+std::vector<double> getOutput() {
+    std::vector<double> output;
+    int outputLayerIndex = m_layers.size() - 1;
+    for (int i = 0; i < m_layers[outputLayerIndex].size(); ++i) {
+        output.push_back(m_layers[outputLayerIndex].getNeuron(i).getValue());
+    }
+    return output;
+}
+
 };
 
 
@@ -194,7 +207,7 @@ int main() {
     NeuralNetwork nn(3, 2, 1); // create your neural network here
 
     // Set the number of iterations and learning rate
-    int iterations = 1000;
+    int iterations = 10000;
     double learningRate = 0.01;
 
     std::vector<std::vector<double>> inputs = {
@@ -209,11 +222,18 @@ int main() {
         {0.0, 0.0, 1.0}    // Iris virginica
     };
 
-
     // Train your neural network
     nn.train(inputs, targets, iterations, learningRate);
 
-    // Here, you could add code to test your trained network on new data...
+    // Get the output of the network
+    std::vector<double> output = nn.getOutput();
+
+    // Print out the output
+    std::cout << "Output: ";
+    for (double val : output) {
+        std::cout << val << " ";
+    }
+    std::cout << std::endl;
 
     return 0;
 }
