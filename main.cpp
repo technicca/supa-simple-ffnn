@@ -89,16 +89,20 @@ private:
 
 public:
     // Constructor
-  NeuralNetwork(int inputSize, int hiddenSize, int outputSize) {
+  NeuralNetwork(int inputSize, int hiddenSize1, int hiddenSize2, int outputSize) {
     // create input layer
-    m_layers.push_back(Layer(inputSize, hiddenSize));
+    m_layers.push_back(Layer(inputSize, hiddenSize1));
 
-    // create hidden layer
-    m_layers.push_back(Layer(hiddenSize, outputSize));
+    // create first hidden layer
+    m_layers.push_back(Layer(hiddenSize1, hiddenSize2));
+    
+    // create second hidden layer    
+    m_layers.push_back(Layer(hiddenSize2, outputSize));
 
     // create output layer (set outputSize to 1 for binary classification)
     m_layers.push_back(Layer(outputSize, 1));
 }
+
 
 
 
@@ -217,7 +221,7 @@ std::vector<double> normalize(const std::vector<double>& input) {
 
 int main() {
     // Initialize your neural network
-    NeuralNetwork nn(3, 2, 1); // create your neural network here
+    NeuralNetwork nn(3, 2, 4, 1);
     
     // Set the number of iterations and learning rate
     int iterations = 1000;
