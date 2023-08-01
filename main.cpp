@@ -4,15 +4,8 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-
-double sigmoid(double x) {
-    return 1.0 / (1.0 + std::exp(-x));
-}
-
-double sigmoidDerivative(double x) {        
-    double sigmoid = 1.0 / (1.0 + std::exp(-x));
-    return sigmoid * (1 - sigmoid);
-}
+#include <algorithm>
+#include "utils.hpp"
 
 class Neuron {
 private:
@@ -28,15 +21,16 @@ public:
 
     // Constructor
     Neuron(int numWeights) : m_value(0.0), m_activation(0.0), m_derived(0.0), m_weights(numWeights), m_gradient(0.0) {
-        // Initialize weights with random values
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<double> dist(0.0, 1.0);
+      // Initialize weights with random values
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::normal_distribution<double> dist(0.0, 0.1); // Change here
 
-        for (double& weight : m_weights) {
-            weight = dist(gen);
-        }
-    }
+      for (double& weight : m_weights) {
+          weight = dist(gen);
+      }
+  }
+
 
     // Copy constructor
     Neuron(const Neuron& other) : m_value(other.m_value), m_activation(other.m_activation), m_derived(other.m_derived), m_gradient(other.m_gradient), m_weights(other.m_weights) {}
@@ -99,7 +93,7 @@ private:
 
 public:
     // Constructor
-    NeuralNetwork(int inputSize, int hiddenSize, int outputSize) {
+  NeuralNetwork(int inputSize, int hiddenSize, int outputSize) {
     // create input layer
     m_layers.push_back(Layer(inputSize, hiddenSize));
 
@@ -107,28 +101,36 @@ public:
     m_layers.push_back(Layer(hiddenSize, outputSize));
 
     // create output layer
-    m_layers.push_back(Layer(outputSize, hiddenSize));
-
+    m_layers.push_back(Layer(outputSize, 0)); // output layer doesn't need to connect to another layer
 }
+
 
 // Training functions:
 
-void feedForward(const std::vector<double>& input){
+void feedForward(const std::vector<double>& input) {
     // Set the input layer
-    for(int i = 0; i < input.size(); ++i)
-        m_layers[0].getNeuron(i).setValue(input[i]); // Assuming setNeuron sets the value of Neuron
-  
-    // Forward propagation
-    for(int i = 1; i < m_layers.size(); ++i)
-        for(int j = 0; j < m_layers[i].size(); ++j){
+    for (int i = 0; i < input.size(); ++i)
+        m_layers[0].getNeuron(i).setValue(input[i]);
+
+    // Forward propagation till the last hidden layer
+    for (int i = 1; i < m_layers.size() - 1; ++i) { // we removed the == operator
+        for (int j = 0; j < m_layers[i].size(); ++j) {
             double activation = 0.0;
-            for(int k = 0; k < m_layers[i-1].size(); ++k)
-                if (i != m_layers.size() - 1) // Check if current layer is not the output layer
-                    if (j < m_layers[i].size()) {
-    activation += m_layers[i-1].getNeuron(k).getValue() * m_layers[i-1].getNeuron(k).getWeight(j);
-}
-            m_layers[i].getNeuron(j).setValue(sigmoid(activation)); // Assuming sigmoid is the activation function
+            for (int k = 0; k < m_layers[i - 1].size(); ++k)
+                activation += m_layers[i - 1].getNeuron(k).getValue() * m_layers[i - 1].getNeuron(k).getWeight(j);
+            m_layers[i].getNeuron(j).setValue(sigmoid(activation));
         }
+    }
+
+    // For the output layer let's apply softmax activation
+    std::vector<double> outputValues;
+    for (int j = 0; j < m_layers.back().size(); ++j) {
+        double activation = 0.0;
+        for (int k = 0; k < m_layers[m_layers.size() - 2].size(); ++k)
+            activation += m_layers[m_layers.size() - 2].getNeuron(k).getValue() * m_layers[m_layers.size() - 2].getNeuron(k).getWeight(j);
+        outputValues.push_back(activation);
+    }
+    softmax(outputValues);
 }
 
 void backPropagate(const std::vector<double>& target){
@@ -156,14 +158,14 @@ void backPropagate(const std::vector<double>& target){
     }
 }
 
-
 double calculateError(const std::vector<double>& target){
-        double totalError = 0;
-        int outputLayerIndex = m_layers.size() - 1;
-        for(int i = 0; i < m_layers[outputLayerIndex].size(); ++i)
-            totalError += pow((target[i] - m_layers[outputLayerIndex].getNeuron(i).getValue()), 2);
-        return totalError / m_layers[outputLayerIndex].size();
-    }
+    double totalError = 0;
+    int outputLayerIndex = m_layers.size() - 1;
+    for(int i = 0; i <m_layers[outputLayerIndex].size(); ++i)
+        totalError += target[i] * log(m_layers[outputLayerIndex].getNeuron(i).getValue() + 1e-10);
+    return -totalError;
+}
+
 
 void updateWeights(double learningRate) {
     for (int i = 1; i < m_layers.size(); ++i) {
@@ -201,14 +203,26 @@ std::vector<double> getOutput() {
 
 };
 
+std::vector<double> normalize(const std::vector<double>& input) {
+    double minVal = *std::min_element(input.begin(), input.end());
+    double maxVal = *std::max_element(input.begin(), input.end());
+
+    std::vector<double> normalizedInput;
+    for (double val : input) {
+        normalizedInput.push_back((val - minVal) / (maxVal - minVal));
+    }
+    
+    return normalizedInput;
+}
+
 
 int main() {
     // Initialize your neural network
     NeuralNetwork nn(3, 2, 1); // create your neural network here
-
+    
     // Set the number of iterations and learning rate
-    int iterations = 10000;
-    double learningRate = 0.01;
+    int iterations = 1000;
+    double learningRate = 0.1;
 
     std::vector<std::vector<double>> inputs = {
         {5.1, 3.5, 1.4, 0.2},   // Iris setosa
@@ -216,11 +230,17 @@ int main() {
         {6.3, 3.3, 6.0, 2.5}    // Iris virginica
     };
 
+    // Normalize your input data
+    for (std::vector<double>& input : inputs) {
+        input = normalize(input);
+    }
+
     std::vector<std::vector<double>> targets = {
         {1.0, 0.0, 0.0},   // Iris setosa
         {0.0, 1.0, 0.0},   // Iris versicolor
         {0.0, 0.0, 1.0}    // Iris virginica
     };
+    
 
     // Train your neural network
     nn.train(inputs, targets, iterations, learningRate);
