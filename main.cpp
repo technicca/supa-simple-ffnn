@@ -1,10 +1,6 @@
-#include <vector>
-#include <random>
-#include <math.h>
-#include <fstream>
-#include <sstream>
+// #include <fstream>
+// #include <sstream>
 #include <iostream>
-#include <algorithm>
 #include "utils.hpp"
 
 class Neuron {
@@ -100,9 +96,10 @@ public:
     // create hidden layer
     m_layers.push_back(Layer(hiddenSize, outputSize));
 
-    // create output layer
-    m_layers.push_back(Layer(outputSize, 0)); // output layer doesn't need to connect to another layer
+    // create output layer (set outputSize to 1 for binary classification)
+    m_layers.push_back(Layer(outputSize, 1));
 }
+
 
 
 // Training functions:
@@ -122,15 +119,15 @@ void feedForward(const std::vector<double>& input) {
         }
     }
 
-    // For the output layer let's apply softmax activation
-    std::vector<double> outputValues;
-    for (int j = 0; j < m_layers.back().size(); ++j) {
+    // For the output layer, apply sigmoid activation for binary classification
+    int outputLayerIndex = m_layers.size() - 1;
+    for (int j = 0; j < m_layers[outputLayerIndex].size(); ++j) {
         double activation = 0.0;
-        for (int k = 0; k < m_layers[m_layers.size() - 2].size(); ++k)
-            activation += m_layers[m_layers.size() - 2].getNeuron(k).getValue() * m_layers[m_layers.size() - 2].getNeuron(k).getWeight(j);
-        outputValues.push_back(activation);
+        for (int k = 0; k < m_layers[outputLayerIndex - 1].size(); ++k)
+            activation += m_layers[outputLayerIndex - 1].getNeuron(k).getValue() * m_layers[outputLayerIndex - 1].getNeuron(k).getWeight(j);
+        double sigmoidActivation = sigmoid(activation);
+        m_layers[outputLayerIndex].getNeuron(j).setValue(sigmoidActivation);
     }
-    softmax(outputValues);
 }
 
 void backPropagate(const std::vector<double>& target){
@@ -158,14 +155,16 @@ void backPropagate(const std::vector<double>& target){
     }
 }
 
-double calculateError(const std::vector<double>& target){
+double calculateError(const std::vector<double>& target) {
     double totalError = 0;
     int outputLayerIndex = m_layers.size() - 1;
-    for(int i = 0; i <m_layers[outputLayerIndex].size(); ++i)
-        totalError += target[i] * log(m_layers[outputLayerIndex].getNeuron(i).getValue() + 1e-10);
+    for (int i = 0; i < m_layers[outputLayerIndex].size(); ++i) {
+        double output = m_layers[outputLayerIndex].getNeuron(i).getValue();
+        double targetVal = target[i];
+        totalError += targetVal * log(output + 1e-10); // Apply the softmax and cross-entropy in the error calculation
+    }
     return -totalError;
 }
-
 
 void updateWeights(double learningRate) {
     for (int i = 1; i < m_layers.size(); ++i) {
@@ -222,7 +221,7 @@ int main() {
     
     // Set the number of iterations and learning rate
     int iterations = 1000;
-    double learningRate = 0.1;
+    double learningRate = 0.01;
 
     std::vector<std::vector<double>> inputs = {
         {5.1, 3.5, 1.4, 0.2},   // Iris setosa
