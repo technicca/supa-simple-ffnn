@@ -22,7 +22,6 @@ double sigmoidDerivative(double x) {
     return x * (1 - x);
 }
 
-
 void softmax(std::vector<double>& values) {
     double max = *std::max_element(values.begin(), values.end());
     double sum = 0.0;
@@ -40,7 +39,5 @@ void softmax(std::vector<double>& values) {
 double softmaxDerivative(int i, const std::vector<double>& softmaxOutputs) {
     return softmaxOutputs[i] * (1 - softmaxOutputs[i]);
 }
-
-
 
 #endif // UTILS
