@@ -1,3 +1,7 @@
+## todo:
+- Debug the xor network (error always 0.25)
+
+
 # Objective:
 Making a basic feeding-forward nerual net in c++
 

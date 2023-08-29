@@ -1,6 +1,6 @@
 #include <iostream>
 #include "utils.hpp"
-
+// debugging the main neural net
 class Neuron {
 private:
     double m_value; // the neuron's value
@@ -158,14 +158,38 @@ double calculateError(const std::vector<double>& target) {
 void updateWeights(double learningRate) {
     for (int i = 1; i < m_layers.size(); ++i) {
         for (int j = 0; j < m_layers[i].size(); ++j) {
+            double deltaSum = 0.0; // Accumulate weight changes for this neuron
             for (int k = 0; k < m_layers[i-1].size(); ++k) {
-                double newWeight = m_layers[i].getNeuron(j).getWeight(k) -
-                                   learningRate * m_layers[i].getNeuron(j).getGradient() * m_layers[i-1].getNeuron(k).getValue();
+                double weightChange = learningRate * m_layers[i].getNeuron(j).getGradient() * m_layers[i-1].getNeuron(k).getValue();
+                deltaSum += weightChange;
+            }
+            for (int k = 0; k < m_layers[i-1].size(); ++k) {
+                double newWeight = m_layers[i].getNeuron(j).getWeight(k) - deltaSum;
                 m_layers[i].getNeuron(j).setWeight(k, newWeight);
             }
         }
     }
 }
+
+void printNetworkState() { //debug
+    for (int i = 0; i < m_layers.size(); ++i) {
+        std::cout << "Layer " << i << ":\n";
+        for (int j = 0; j < m_layers[i].size(); ++j) {
+            Neuron& neuron = m_layers[i].getNeuron(j);
+            std::cout << "  Neuron " << j << ": Value = " << neuron.getValue() << ", Activation = " << neuron.getActivation() << ", Gradient = " << neuron.getGradient() << "\n";
+            if (i > 0) {
+                std::cout << "    Weights: ";
+                for (int k = 0; k < m_layers[i - 1].size(); ++k) {
+                    std::cout << neuron.getWeight(k) << " ";
+                }
+                std::cout << "\n";
+            }
+        }
+        std::cout << "\n";
+    }
+    std::cout << "-------------------\n";
+}
+
 
 void train(const std::vector<std::vector<double>>& inputs, const std::vector<std::vector<double>>& targets, int iterations, double learningRate) {
     for (int i = 0; i < iterations; i++) {
@@ -175,8 +199,12 @@ void train(const std::vector<std::vector<double>>& inputs, const std::vector<std
             backPropagate(targets[j]);
             updateWeights(learningRate);
             totalError += calculateError(targets[j]);
+
+            // Debugging statements
+            std::cout << "Sample: " << j << ", Total Error: " << totalError << std::endl;
+            printNetworkState(); // Print activations, gradients, weights, etc.
         }
-        std::cout << "Iteration: " << i + 1 << " / " << iterations << ", Error: " << totalError / inputs.size() << std::endl;
+        std::cout << "Iteration: " << i + 1 << " / " << iterations << ", Average Error: " << totalError / inputs.size() << std::endl;
     }
 }
 
@@ -205,7 +233,6 @@ std::vector<double> normalize(const std::vector<double>& input) {
 
 
 int main() {
-    srand(time(NULL));
     // Initialize the net
     NeuralNetwork nn(3, 2, 4, 1);
     
