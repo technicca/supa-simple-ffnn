@@ -17,15 +17,16 @@ public:
 
     // Constructor
     Neuron(int numWeights) : m_value(0.0), m_activation(0.0), m_derived(0.0), m_weights(numWeights), m_gradient(0.0) {
-      // Initialize weights with random values
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      std::normal_distribution<double> dist(0.0, 0.1); // Change here
+    // Initialize weights with random values
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<double> dist(0.0, std::sqrt(2.0 / numWeights)); // He initialization
 
-      for (double& weight : m_weights) {
-          weight = dist(gen);
-      }
-  }
+    for (double& weight : m_weights) {
+        weight = dist(gen);
+    }
+}
+
 
 
     // Copy constructor
@@ -111,7 +112,7 @@ void feedForward(const std::vector<double>& input) {
         m_layers[0].getNeuron(i).setValue(input[i]);
 
     // Forward propagation till the last hidden layer
-    for (int i = 1; i < m_layers.size() - 1; ++i) { // removed the == operator
+    for (int i = 1; i < m_layers.size() - 1; ++i) { // we removed the == operator
         for (int j = 0; j < m_layers[i].size(); ++j) {
             double activation = 0.0;
             for (int k = 0; k < m_layers[i - 1].size(); ++k)
@@ -137,7 +138,7 @@ void backPropagate(const std::vector<double>& target){
     for(int i = 0; i < m_layers[outputLayerIndex].size(); ++i){
         double output = m_layers[outputLayerIndex].getNeuron(i).getValue();
         double targetVal = target[i];
-        double gradient = (output - targetVal) * sigmoidDerivative(output);
+        double gradient = (output - targetVal) * sigmoidDerivative(output); // here change, pass output of sigmoid
         m_layers[outputLayerIndex].getNeuron(i).setGradient(gradient);
     }
 
@@ -150,11 +151,13 @@ void backPropagate(const std::vector<double>& target){
                     if (k < m_layers[i+1].size()) {
     error += m_layers[i+1].getNeuron(k).getGradient() * m_layers[i].getNeuron(j).getWeight(k);
 }
-            double gradient = error * sigmoidDerivative(m_layers[i].getNeuron(j).getValue());
+            double output = m_layers[i].getNeuron(j).getValue(); // get output of sigmoid for this layer
+            double gradient = error * sigmoidDerivative(output); // use output
             m_layers[i].getNeuron(j).setGradient(gradient);
         }
     }
 }
+
 
 double calculateError(const std::vector<double>& target) {
     double totalError = 0;
@@ -203,7 +206,7 @@ std::vector<double> getOutput() {
 
 };
 
-std::vector<double> normalize(const std::vector<double>& input) {
+std::vector<double> normalize(const std::vector<double>& input) { // old function
     double minVal = *std::min_element(input.begin(), input.end());
     double maxVal = *std::max_element(input.begin(), input.end());
 
@@ -215,14 +218,27 @@ std::vector<double> normalize(const std::vector<double>& input) {
     return normalizedInput;
 }
 
+std::vector<double> standardize(const std::vector<double>& input) {
+    double mean = std::accumulate(input.begin(), input.end(), 0.0) / input.size();
+    double sq_sum = std::inner_product(input.begin(), input.end(), input.begin(), 0.0);
+    double std_dev = std::sqrt(sq_sum / input.size() - mean * mean);
+
+    std::vector<double> standardizedInput;
+    for (double val : input) {
+        standardizedInput.push_back((val - mean) / std_dev);
+    }
+    
+    return standardizedInput;
+}
+
 
 int main() {
     // Initialize your neural network
-    NeuralNetwork nn(3, 2, 4, 1);
+    NeuralNetwork nn(4, 1, 8, 3);
     
     // Set the number of iterations and learning rate
     int iterations = 1000;
-    double learningRate = 0.01;
+    double learningRate = 0.1;
 
     std::vector<std::vector<double>> inputs = {
         {5.1, 3.5, 1.4, 0.2},   // Iris setosa
@@ -231,9 +247,11 @@ int main() {
     };
 
     // Normalize your input data
+    // Standardize your input data
     for (std::vector<double>& input : inputs) {
-        input = normalize(input);
+        input = standardize(input);
     }
+
 
     std::vector<std::vector<double>> targets = {
         {1.0, 0.0, 0.0},   // Iris setosa
