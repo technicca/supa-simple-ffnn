@@ -1,168 +1,172 @@
-#include <cmath>
-#include <vector>
+// XOR problem neural net
+
 #include <iostream>
-#include <cstdlib>
-#include <ctime>
+#include <vector>
+#include <cmath>
+#include <random>
 
-using namespace std;
+float random_float(float min, float max) {
+    static std::default_random_engine e;
+    static std::uniform_real_distribution<> dis(min, max); // rage 0 - 1
+    return dis(e);
+}
 
-// Define the structure of a neuron
-struct Neuron {
-    double value;
-    vector<double> weights;
-};
-
-// Define the structure of a layer
-typedef vector<Neuron> Layer;
-
-// Define the structure of a network
-struct Network {
-    vector<Layer> layers;
-};
-
-double sigmoid(double x) {
+float sigmoid(float x) {
     return 1 / (1 + exp(-x));
 }
 
-double sigmoid_derivative(double x) {
-    double sigmoid_x = sigmoid(x);
-    return sigmoid_x * (1 - sigmoid_x);
+float sigmoid_derivative(float x) {
+    return x * (1 - x);
 }
 
-// Forward propagation
-void forward(Network& network, vector<double> input) {
-    for (int i = 0; i < network.layers[0].size(); i++) {
-        network.layers[0][i].value = input[i];
-    }
-
-    for (int i = 1; i < network.layers.size(); i++) {
-        for (int j = 0; j < network.layers[i].size(); j++) {
-            double sum = 0;
-            for (int k = 0; k < network.layers[i - 1].size(); k++) {
-                sum += network.layers[i - 1][k].value * network.layers[i - 1][k].weights[j];
-            }
-            network.layers[i][j].value = sigmoid(sum);
-        }
-    }
+std::vector<std::vector<float>> initialize_matrix(int rows, int cols) {
+    std::vector<std::vector<float>> matrix(rows, std::vector<float>(cols));
+    for(int i=0; i<rows; i++)
+        for(int j=0; j<cols; j++)
+            matrix[i][j] = random_float(-1, 1);
+    return matrix;
 }
 
-double learning_rate = 0.023;
-
-// Mean squared error function
-double mse(vector<double> target, vector<double> output) {
-    double sum = 0;
-    for (int i = 0; i < target.size(); i++) {
-        sum += pow(target[i] - output[i], 2);
-    }
-    return sum / target.size();
+std::vector<std::vector<float>> matrix_multiply(std::vector<std::vector<float>> a, std::vector<std::vector<float>> b) {
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(b[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<b[0].size(); j++)
+            for(int k=0; k<a[0].size(); k++)
+                result[i][j] += a[i][k] * b[k][j];
+    return result;
 }
 
-// Backward propagation
-void backward(Network& network, vector<double> target) {
-    // Calculate output layer errors
-    vector<double> errors(network.layers.back().size());
-    for (int i = 0; i < network.layers.back().size(); i++) {
-        errors[i] = target[i] - network.layers.back()[i].value;
+std::vector<std::vector<float>> matrix_add(std::vector<std::vector<float>> a, std::vector<std::vector<float>> b) {
+    if (a.size() != b.size() || a[0].size() != b[0].size()) {
+        throw std::invalid_argument("Both matrices must be of the same size");
     }
-
-    // Update output layer weights
-    for (int i = 0; i < network.layers.back().size(); i++) {
-        for (int j = 0; j < network.layers[network.layers.size() - 2].size(); j++) {
-            double delta = learning_rate * errors[i] * sigmoid_derivative(network.layers.back()[i].value);
-            network.layers[network.layers.size() - 2][j].weights[i] += delta;
-        }
-    }
-
-    // Propagate the errors and update weights for hidden layers
-    for (int i = network.layers.size() - 2; i > 0; i--) {
-        vector<double> errors_next(network.layers[i].size());
-        for (int j = 0; j < network.layers[i].size(); j++) {
-            for (int k = 0; k < network.layers[i + 1].size(); k++) {
-                errors_next[j] += errors[k] * network.layers[i][j].weights[k];
-            }
-        }
-        errors = errors_next;
-
-        for (int j = 0; j < network.layers[i].size(); j++) {
-            for (int k = 0; k < network.layers[i - 1].size(); k++) {
-                double delta = learning_rate * errors[j] * sigmoid_derivative(network.layers[i][j].value);
-                network.layers[i - 1][k].weights[j] += delta;
-            }
-        }
-    }
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(a[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<a[0].size(); j++)
+            result[i][j] = a[i][j] + b[i][j];
+    return result;
 }
 
 
-// Prediction function
-vector<double> predict(Network& network, vector<double> input) {
-    forward(network, input);
-    vector<double> output(network.layers.back().size());
-    for (int i = 0; i < network.layers.back().size(); i++) {
-        output[i] = network.layers.back()[i].value;
-    }
-    return output;
+// sigmoid function to a matrix. This will be used in the forward propagation step
+std::vector<std::vector<float>> apply_sigmoid(std::vector<std::vector<float>> a) {
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(a[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<a[0].size(); j++)
+            result[i][j] = sigmoid(a[i][j]);
+    return result;
 }
 
-void train(Network& network, vector<vector<double>> inputs, vector<vector<double>> targets, int epochs) {
-    double first_error, last_error;
-    for (int i = 0; i < epochs; i++) {
-        double sum_error = 0;
-        for (int j = 0; j < inputs.size(); j++) {
-            forward(network, inputs[j]);
-            vector<double> output = predict(network, inputs[j]);
-            double error = mse(targets[j], output);
-            sum_error += error;
-            if (i == 0 && j == 0) {
-                first_error = error;
-            }
-            backward(network, targets[j]);
-        }
-        if (i == epochs - 1) {
-            last_error = sum_error / inputs.size();
-        }
-    }
-    cout << "First error: " << first_error << endl;
-    cout << "Last error: " << last_error << endl;
+std::vector<std::vector<float>> matrix_subtract(std::vector<std::vector<float>> a, std::vector<std::vector<float>> b) {
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(a[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<a[0].size(); j++)
+            result[i][j] = a[i][j] - b[i][j];
+    return result;
 }
 
-// Function to print the results
-void printResults(Network& network, vector<vector<double>> inputs) {
-    for (int i = 0; i < inputs.size(); i++) {
-        vector<double> output = predict(network, inputs[i]);
-        cout << "Input: ";
-        for (int j = 0; j < inputs[i].size(); j++) {
-            cout << inputs[i][j] << " ";
-        }
-        cout << "Output: ";
-        for (int j = 0; j < output.size(); j++) {
-            cout << output[j] << " ";
-        }
-        cout << endl;
-    }
+// Apply the sigmoid derivative function to a matrix
+std::vector<std::vector<float>> apply_sigmoid_derivative(std::vector<std::vector<float>> a) {
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(a[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<a[0].size(); j++)
+            result[i][j] = sigmoid_derivative(a[i][j]);
+    return result;
+}
+
+// perform elementwise multiplication of two matrices. This will be used in the backpropagation step
+std::vector<std::vector<float>> elementwise_multiply(std::vector<std::vector<float>> a, std::vector<std::vector<float>> b) {
+    std::vector<std::vector<float>> result(a.size(), std::vector<float>(a[0].size()));
+    for(int i=0; i<a.size(); i++)
+        for(int j=0; j<a[0].size(); j++)
+            result[i][j] = a[i][j] * b[i][j];
+    return result;
+}
+
+void update_weights_and_biases(std::vector<std::vector<float>>& weights, std::vector<std::vector<float>>& biases, std::vector<std::vector<float>> delta, std::vector<std::vector<float>> inputs, float lr) {
+    for(int i=0; i<weights.size(); i++)
+        for(int j=0; j<weights[0].size(); j++)
+            for(int k=0; k<delta.size(); k++)
+                weights[i][j] += inputs[k][i] * delta[k][j] * lr;
+    for(int i=0; i<biases.size(); i++)
+        for(int j=0; j<biases[0].size(); j++)
+            biases[i][j] += delta[i][j] * lr;
 }
 
 int main() {
-    srand(time(NULL));
-    // Initialize a network
-    Network network;
-    network.layers = {Layer(2), Layer(2), Layer(1)};
+    std::vector<std::vector<float>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}}; // XOR dataset
+    std::vector<std::vector<float>> expected_output = {{0}, {1}, {1}, {0}};
 
-    // Initialize weights
-    for (int i = 0; i < network.layers.size() - 1; i++) {
-        for (int j = 0; j < network.layers[i].size(); j++) {
-            network.layers[i][j].weights = vector<double>(network.layers[i + 1].size());
-            for (int k = 0; k < network.layers[i + 1].size(); k++) {
-                double limit = sqrt(6.0 / (network.layers[i].size() + network.layers[i + 1].size()));
-                network.layers[i][j].weights[k] = ((double) rand() / (RAND_MAX)) * 2 * limit - limit; // Initialize to random values between -limit and limit
-            }
-        }
+    int epochs = 20000;
+    float lr = 0.8;
+    int inputLayerNeurons = 2, hiddenLayerNeurons = 19, outputLayerNeurons = 1;
+
+    // Random weights and bias initialization
+    std::vector<std::vector<float>> hidden_weights = initialize_matrix(inputLayerNeurons, hiddenLayerNeurons);
+    std::vector<std::vector<float>> hidden_bias = initialize_matrix(inputs.size(), hiddenLayerNeurons);
+    std::vector<std::vector<float>> output_weights = initialize_matrix(hiddenLayerNeurons, outputLayerNeurons);
+    std::vector<std::vector<float>> output_bias = initialize_matrix(inputs.size(), outputLayerNeurons);
+
+    for(int epoch=0; epoch<epochs; epoch++) { // main training loop
+        
+        // Forward Propagation
+        std::vector<std::vector<float>> hidden_layer_activation = matrix_add(matrix_multiply(inputs, hidden_weights), hidden_bias);
+        std::vector<std::vector<float>> hidden_layer_output = apply_sigmoid(hidden_layer_activation);
+
+        std::vector<std::vector<float>> output_layer_activation = matrix_add(matrix_multiply(hidden_layer_output, output_weights), output_bias);
+        std::vector<std::vector<float>> predicted_output = apply_sigmoid(output_layer_activation);
+
+        // Backward propagation
+        std::vector<std::vector<float>> error = matrix_subtract(expected_output, predicted_output);
+        std::vector<std::vector<float>> d_predicted_output = elementwise_multiply(error, apply_sigmoid_derivative(predicted_output));
+        
+        std::vector<std::vector<float>> error_hidden_layer = matrix_multiply(d_predicted_output, output_weights);
+        std::vector<std::vector<float>> d_hidden_layer = elementwise_multiply(error_hidden_layer, apply_sigmoid_derivative(hidden_layer_output));
+
+        // Updating Weights and Biases
+        update_weights_and_biases(output_weights, output_bias, d_predicted_output, hidden_layer_output, lr);
+        update_weights_and_biases(hidden_weights, hidden_bias, d_hidden_layer, inputs, lr);
     }
 
-    vector<vector<double>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    vector<vector<double>> targets = {{0}, {1}, {1}, {0}};
-    train(network, inputs, targets, 2000); // epochs
-    // Print the results
-    printResults(network, inputs);
+    std::cout << "Final hidden weights: \n"; // print the output
+    for(auto& row : hidden_weights) {
+        for(auto& val : row)
+            std::cout << val << ' ';
+        std::cout << '\n';
+    }
+
+    std::cout << "Final hidden bias: \n";
+    for(auto& row : hidden_bias) {
+        for(auto& val : row)
+            std::cout << val << ' ';
+        std::cout << '\n';
+    }
+
+    std::cout << "Final output weights: \n";
+    for(auto& row : output_weights) {
+        for(auto& val : row)
+            std::cout << val << ' ';
+        std::cout << '\n';
+    }
+
+    std::cout << "Final output bias: \n";
+    for(auto& row : output_bias) {
+        for(auto& val : row)
+            std::cout << val << ' ';
+        std::cout << '\n';
+    }
+
+    std::cout << "\nOutput from neural network after " << epochs << " epochs: \n";
+    std::vector<std::vector<float>> hidden_layer_activation = matrix_add(matrix_multiply(inputs, hidden_weights), hidden_bias);
+    std::vector<std::vector<float>> hidden_layer_output = apply_sigmoid(hidden_layer_activation);
+
+    std::vector<std::vector<float>> output_layer_activation = matrix_add(matrix_multiply(hidden_layer_output, output_weights), output_bias);
+    std::vector<std::vector<float>> predicted_output = apply_sigmoid(output_layer_activation);
+    for(auto& row : predicted_output) {
+        for(auto& val : row)
+            std::cout << val << ' ';
+        std::cout << '\n';
+    }
 
     return 0;
 }

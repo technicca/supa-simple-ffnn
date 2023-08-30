@@ -1,5 +1,7 @@
-## todo:
-- Debug the xor network (error always 0.25)
+## Info:
+- xor.cpp - a sample neural net for the xor problem
+- relu.cpp - a sample implementation of a relu function
+- iris.cpp (WIP) - a sample neural net for the iris dataset. Doens't work as expected for now.
 
 
 # Objective:

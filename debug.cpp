@@ -1,6 +1,6 @@
 #include <iostream>
 #include "utils.hpp"
-// debugging the main neural net
+// debugging the iris neural net
 class Neuron {
 private:
     double m_value; // the neuron's value

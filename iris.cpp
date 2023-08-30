@@ -1,3 +1,5 @@
+// iris dataset neural net - need to debug
+
 #include <iostream>
 #include "utils.hpp"
 
